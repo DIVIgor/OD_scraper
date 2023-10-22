@@ -19,13 +19,13 @@ HEADERS = {
 HOST = 'https://www.oxfordlearnersdictionaries.com'
 ENDP = '/wordlists/oxford3000-5000'
 # Main selectors
-WLIST_SEL = 'ul.top-g > li:not([class])' # Somehow it still takes tags with classes that are hidden
+WLIST_SEL = 'ul.top-g > li'
 WORD_DURL_SEL = 'a'
 SPART_SEL = 'span.pos'
 LVL_SEL = 'span.belong-to'
 WPRON_SEL = 'div.pron-us'
 # Detailed selectors
-SECTION_SEL = '#entryContent ol > li'
+SECTION_SEL = '.sense' #'#entryContent ol > li' unclear results
 DEF_SEL = 'span.def'
 EX_SEL = 'ul.examples span.x'
 # Attributes to get
@@ -69,6 +69,10 @@ def main():
     url = HOST + ENDP
     main_soup = get_processed_page(url)
     word_list = main_soup.select(WLIST_SEL)
+    # Getting a list of not hidden elements (selector does not work)
+    word_list = [word for word in word_list if len(word.attrs) > 1]
+    total_words = len(word_list)
+    print(f"[Log] Found {total_words} words.")
 
     word_set = []
     try:
@@ -121,7 +125,7 @@ def main():
         word_df.to_csv(OUTPUT_NAME, index=None)
 
     print(" RESULT ".center(150, '='))
-    print(f"[Log] Scraped {len(word_set)} words out of {len(word_list)}.")
+    print(f"[Log] Scraped {len(word_set)} words out of {total_words}.")
 
 
 if __name__ == '__main__':
