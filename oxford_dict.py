@@ -49,7 +49,11 @@ def get_processed_page(url: str, host:str=HOST,
     """Check if the URL contains the host. Make a request and a soup."""
     url = check_host_in_url(url, host=host)
 
-    resp = requests.get(url, headers=headers, timeout=timeout)
+    try:
+        resp = requests.get(url, headers=headers, timeout=timeout)
+    except Exception:
+        sleep(30)
+        get_processed_page(url, host, headers, timeout, soup_mode)
     soup = None
 
     if resp.status_code == 200:
@@ -61,22 +65,26 @@ def get_processed_page(url: str, host:str=HOST,
 
 
 def main():
-    if not AUDIO_PATH in os.listdir():
+    dir_list = os.listdir()
+    if not AUDIO_PATH in dir_list:
         os.mkdir(AUDIO_PATH)
+
+    dict_df = pd.read_csv(OUTPUT_NAME) if OUTPUT_NAME in dir_list else None
+    start_val = 0 if dict_df is None else dict_df.last_valid_index() + 1
 
     mp3_files = os.listdir(AUDIO_PATH)
 
     url = HOST + ENDP
     main_soup = get_processed_page(url)
     word_list = main_soup.select(WLIST_SEL)
-    # Getting a list of not hidden elements (selector does not work)
+    # Getting a list from not hidden elements (selector does not work)
     word_list = [word for word in word_list if len(word.attrs) > 1]
     total_words = len(word_list)
     print(f"[Log] Found {total_words} words.")
 
     word_set = []
     try:
-        for w in word_list[:100]:
+        for w in word_list[start_val:]:
             print('-'*150)
             word_el = w.select_one(WORD_DURL_SEL)
             part_of_sentence_el = w.select_one(SPART_SEL)
@@ -103,8 +111,10 @@ def main():
             det_soup = get_processed_page(wurl)
             details = det_soup.select(SECTION_SEL)
 
-            definitions = [det.select_one(DEF_SEL).text for det in details[:2]]
-            examples = [det.select_one(EX_SEL).text for det in details[:2]]
+            definitions = [det.select_one(DEF_SEL).text for det in details[:2]
+                           if det.select_one(DEF_SEL)]
+            examples = [det.select_one(EX_SEL).text for det in details[:2]
+                        if det.select_one(EX_SEL)]
 
             word_set.append(
                 {
@@ -121,11 +131,12 @@ def main():
     except Exception as e:
         print(f"[Error] Exception occured: {e}")
     finally:
-        word_df = pd.DataFrame(word_set, index=None)
-        word_df.to_csv(OUTPUT_NAME, index=None)
+        words_df = pd.DataFrame(word_set, index=None)
+        output_df = words_df if dict_df is None else pd.concat([dict_df, words_df])
+        output_df.to_csv(OUTPUT_NAME, index=None)
 
     print(" RESULT ".center(150, '='))
-    print(f"[Log] Scraped {len(word_set)} words out of {total_words}.")
+    print(f"[Log] Scraped {start_val + len(word_set)} words out of {total_words}.")
 
 
 if __name__ == '__main__':
